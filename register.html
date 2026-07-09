@@ -1,0 +1,364 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Dashboard ยอดจดทะเบียน Kubota vs Yanmar | สกลนคร-นครพนม</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.5.1"></script>
+<style>
+  :root{
+    --bg-header:#1f2937;
+    --accent-kobuta:#f59e0b;
+    --accent-yanmar:#dc2626;
+    --bg-card:#ffffff;
+    --bg-page:#f3f4f6;
+    --text-primary:#111827;
+    --text-secondary:#6b7280;
+    --text-on-dark:#f9fafb;
+    --radius:12px;
+    --gap:18px;
+    --positive:#059669;
+    --negative:#dc2626;
+  }
+  *{box-sizing:border-box;}
+  body{
+    margin:0;
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Sarabun",sans-serif;
+    background:var(--bg-page);
+    color:var(--text-primary);
+  }
+  .dashboard-container{max-width:1400px;margin:0 auto;padding:20px;}
+  .dashboard-header{
+    background:linear-gradient(135deg,#1f2937 0%,#111827 100%);
+    color:var(--text-on-dark);
+    padding:24px 28px;
+    border-radius:var(--radius);
+    margin-bottom:var(--gap);
+    display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:16px;
+  }
+  .dashboard-header h1{font-size:22px;font-weight:700;margin:0 0 4px 0;}
+  .dashboard-header p{margin:0;font-size:13px;color:#9ca3af;}
+  .filters{display:flex;gap:12px;align-items:center;flex-wrap:wrap;}
+  .filter-group{display:flex;flex-direction:column;gap:4px;}
+  .filter-group label{font-size:11px;color:#9ca3af;text-transform:uppercase;letter-spacing:.5px;}
+  .filter-group select{
+    padding:8px 12px;border:1px solid rgba(255,255,255,.2);border-radius:6px;
+    background:rgba(255,255,255,.08);color:var(--text-on-dark);font-size:13px;min-width:170px;
+  }
+  .filter-group select option{background:#1f2937;color:#f9fafb;}
+
+  .kpi-row{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:var(--gap);margin-bottom:var(--gap);}
+  .kpi-card{background:var(--bg-card);border-radius:var(--radius);padding:18px 22px;box-shadow:0 1px 3px rgba(0,0,0,.08);}
+  .kpi-label{font-size:12px;color:var(--text-secondary);text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px;}
+  .kpi-value{font-size:26px;font-weight:700;margin-bottom:4px;}
+  .kpi-value.kobuta{color:var(--accent-kobuta);}
+  .kpi-value.yanmar{color:var(--accent-yanmar);}
+  .kpi-sub{font-size:12px;color:var(--text-secondary);}
+
+  .chart-row{display:grid;grid-template-columns:2fr 1fr;gap:var(--gap);margin-bottom:var(--gap);}
+  .chart-row.two-col{grid-template-columns:1fr 1fr;}
+  .chart-container{background:var(--bg-card);border-radius:var(--radius);padding:20px 22px;box-shadow:0 1px 3px rgba(0,0,0,.08);}
+  .chart-container h3{font-size:14px;font-weight:600;margin:0 0 14px 0;color:var(--text-primary);}
+  .chart-container canvas{max-height:340px;}
+  .chart-wrap{position:relative;height:340px;}
+
+  .table-section{background:var(--bg-card);border-radius:var(--radius);padding:20px 22px;box-shadow:0 1px 3px rgba(0,0,0,.08);overflow-x:auto;}
+  .table-section h3{font-size:14px;font-weight:600;margin:0 0 14px 0;}
+  table.data-table{width:100%;border-collapse:collapse;font-size:13px;}
+  .data-table thead th{
+    text-align:left;padding:10px 12px;border-bottom:2px solid #e5e7eb;
+    color:var(--text-secondary);font-weight:600;font-size:11px;text-transform:uppercase;
+    letter-spacing:.4px;white-space:nowrap;cursor:pointer;user-select:none;
+  }
+  .data-table thead th:hover{background:#f9fafb;color:var(--text-primary);}
+  .data-table tbody td{padding:9px 12px;border-bottom:1px solid #f1f1f1;white-space:nowrap;}
+  .data-table tbody tr:hover{background:#f9fafb;}
+  .badge{padding:3px 10px;border-radius:20px;font-size:11px;font-weight:600;display:inline-block;}
+  .badge.Attack{background:#fee2e2;color:#b91c1c;}
+  .badge.Analyze{background:#fef3c7;color:#92400e;}
+  .badge.Monitor{background:#e0e7ff;color:#3730a3;}
+  .badge.Maintain{background:#d1fae5;color:#065f46;}
+  .badge.High{background:#111827;color:#fff;}
+  .badge.Medium{background:#9ca3af;color:#fff;}
+  .badge.Low{background:#e5e7eb;color:#374151;}
+  .bar-mini{background:#f1f5f9;border-radius:6px;overflow:hidden;height:8px;width:100px;display:inline-block;vertical-align:middle;margin-right:6px;}
+  .bar-mini-fill{height:100%;border-radius:6px;}
+
+  .footer-note{margin-top:14px;font-size:12px;color:var(--text-secondary);text-align:center;}
+
+  @media (max-width:900px){
+    .chart-row, .chart-row.two-col{grid-template-columns:1fr;}
+  }
+</style>
+</head>
+<body>
+<div class="dashboard-container">
+
+  <header class="dashboard-header">
+    <div>
+      <h1>ยอดจดทะเบียนรถแทรกเตอร์ Kubota vs Yanmar</h1>
+      <p>พื้นที่สกลนคร &amp; นครพนม | ข้อมูลรายไตรมาส FY26 (เพื่อวางแผน Marketing)</p>
+    </div>
+    <div class="filters">
+      <div class="filter-group">
+        <label>จังหวัด</label>
+        <select id="filter-province">
+          <option value="all">ทั้งหมด</option>
+        </select>
+      </div>
+      <div class="filter-group">
+        <label>ไตรมาส</label>
+        <select id="filter-quarter">
+          <option value="annual">ทั้งปี (Annual)</option>
+          <option value="Q1">Q1</option>
+          <option value="Q2">Q2</option>
+          <option value="Q3">Q3</option>
+          <option value="Q4">Q4</option>
+        </select>
+      </div>
+      <div class="filter-group">
+        <label>เรียงตาม</label>
+        <select id="filter-sort">
+          <option value="ky_desc">ยอดรวม (มาก→น้อย)</option>
+          <option value="kobuta_desc">Kubota (มาก→น้อย)</option>
+          <option value="yanmar_desc">Yanmar (มาก→น้อย)</option>
+          <option value="mix_desc">Yanmar Mix % (มาก→น้อย)</option>
+        </select>
+      </div>
+    </div>
+  </header>
+
+  <section class="kpi-row" id="kpi-row"></section>
+
+  <section class="chart-row">
+    <div class="chart-container">
+      <h3 id="chart1-title">ยอดจดทะเบียนแยกตามอำเภอ: Kubota vs Yanmar</h3>
+      <div class="chart-wrap"><canvas id="districtChart"></canvas></div>
+    </div>
+    <div class="chart-container">
+      <h3>สัดส่วนตลาดรวมพื้นที่ (Kubota vs Yanmar)</h3>
+      <div class="chart-wrap"><canvas id="pieChart"></canvas></div>
+    </div>
+  </section>
+
+  <section class="chart-row two-col">
+    <div class="chart-container">
+      <h3>แนวโน้มยอดจดทะเบียนรายไตรมาส (Q1-Q4)</h3>
+      <div class="chart-wrap"><canvas id="trendChart"></canvas></div>
+    </div>
+    <div class="chart-container">
+      <h3>Yanmar Market Share (%) แยกตามอำเภอ</h3>
+      <div class="chart-wrap"><canvas id="shareChart"></canvas></div>
+    </div>
+  </section>
+
+  <section class="table-section">
+    <h3>ตารางรายละเอียดแต่ละอำเภอ</h3>
+    <table class="data-table" id="data-table">
+      <thead>
+        <tr>
+          <th data-key="province">จังหวัด</th>
+          <th data-key="district">อำเภอ</th>
+          <th data-key="kobuta">Kubota</th>
+          <th data-key="yanmar">Yanmar</th>
+          <th data-key="ky">รวม (K+Y)</th>
+          <th data-key="mix">Yanmar Mix %</th>
+          <th data-key="strategy">Strategy</th>
+          <th data-key="priority">Priority</th>
+        </tr>
+      </thead>
+      <tbody></tbody>
+    </table>
+  </section>
+
+  <p class="footer-note">
+    หมายเหตุ: ข้อมูลในไฟล์ต้นฉบับมีความละเอียดระดับ "รายไตรมาส" (Q1-Q4) ไม่ใช่รายเดือน จึงสรุปแดชบอร์ดนี้ตามไตรมาส —
+    เลือก "ทั้งปี" เพื่อดูภาพรวม FY26 หรือเลือกไตรมาสเพื่อดู momentum ล่าสุดของแต่ละอำเภอ
+  </p>
+
+</div>
+
+<script>
+const RAW = [{"province": "Nakhon Phanom", "district": "Mueang Nakhon Phanom", "annual": {"kobuta": 81, "yanmar": 18, "ky": 99, "mix": 0.17, "strategy": "Attack", "priority": "High"}, "Q1": {"kobuta": 23, "yanmar": 4, "ky": 27, "mix": 0.13, "strategy": "Attack", "priority": "High"}, "Q2": {"kobuta": 17, "yanmar": 3, "ky": 20, "mix": 0.19, "strategy": "Analyze", "priority": "High"}, "Q3": {"kobuta": 18, "yanmar": 7, "ky": 25, "mix": 0.18, "strategy": "Attack", "priority": "High"}, "Q4": {"kobuta": 23, "yanmar": 4, "ky": 27, "mix": 0.21, "strategy": "Attack", "priority": "High"}}, {"province": "Nakhon Phanom", "district": "Si Songkhram", "annual": {"kobuta": 70, "yanmar": 7, "ky": 77, "mix": 0.13, "strategy": "Monitor", "priority": "High"}, "Q1": {"kobuta": 31, "yanmar": 1, "ky": 32, "mix": 0.15, "strategy": "Analyze", "priority": "High"}, "Q2": {"kobuta": 15, "yanmar": 2, "ky": 17, "mix": 0.16, "strategy": "Attack", "priority": "High"}, "Q3": {"kobuta": 12, "yanmar": 2, "ky": 14, "mix": 0.1, "strategy": "Attack", "priority": "High"}, "Q4": {"kobuta": 12, "yanmar": 2, "ky": 14, "mix": 0.11, "strategy": "Monitor", "priority": "High"}}, {"province": "Nakhon Phanom", "district": "Na Kae", "annual": {"kobuta": 50, "yanmar": 7, "ky": 57, "mix": 0.1, "strategy": "Analyze", "priority": "High"}, "Q1": {"kobuta": 16, "yanmar": 2, "ky": 18, "mix": 0.09, "strategy": "Maintain", "priority": "High"}, "Q2": {"kobuta": 8, "yanmar": 2, "ky": 10, "mix": 0.09, "strategy": "Analyze", "priority": "High"}, "Q3": {"kobuta": 12, "yanmar": 0, "ky": 12, "mix": 0.09, "strategy": "Analyze", "priority": "High"}, "Q4": {"kobuta": 14, "yanmar": 3, "ky": 17, "mix": 0.13, "strategy": "Monitor", "priority": "High"}}, {"province": "Nakhon Phanom", "district": "Pla Pak", "annual": {"kobuta": 50, "yanmar": 5, "ky": 55, "mix": 0.09, "strategy": "Analyze", "priority": "High"}, "Q1": {"kobuta": 26, "yanmar": 3, "ky": 29, "mix": 0.14, "strategy": "Analyze", "priority": "High"}, "Q2": {"kobuta": 7, "yanmar": 2, "ky": 9, "mix": 0.08, "strategy": "Analyze", "priority": "High"}, "Q3": {"kobuta": 13, "yanmar": 0, "ky": 13, "mix": 0.09, "strategy": "Analyze", "priority": "High"}, "Q4": {"kobuta": 4, "yanmar": 0, "ky": 4, "mix": 0.03, "strategy": "Attack", "priority": "High"}}, {"province": "Nakhon Phanom", "district": "Phon Sawan", "annual": {"kobuta": 48, "yanmar": 5, "ky": 53, "mix": 0.09, "strategy": "Attack", "priority": "High"}, "Q1": {"kobuta": 18, "yanmar": 3, "ky": 21, "mix": 0.1, "strategy": "Attack", "priority": "High"}, "Q2": {"kobuta": 6, "yanmar": 0, "ky": 6, "mix": 0.06, "strategy": "Analyze", "priority": "High"}, "Q3": {"kobuta": 14, "yanmar": 1, "ky": 15, "mix": 0.11, "strategy": "Attack", "priority": "High"}, "Q4": {"kobuta": 10, "yanmar": 1, "ky": 11, "mix": 0.08, "strategy": "Monitor", "priority": "High"}}, {"province": "Nakhon Phanom", "district": "Na Thom", "annual": {"kobuta": 33, "yanmar": 9, "ky": 42, "mix": 0.07, "strategy": "Attack", "priority": "High"}, "Q1": {"kobuta": 13, "yanmar": 3, "ky": 16, "mix": 0.08, "strategy": "Attack", "priority": "High"}, "Q2": {"kobuta": 4, "yanmar": 4, "ky": 8, "mix": 0.07, "strategy": "Attack", "priority": "High"}, "Q3": {"kobuta": 8, "yanmar": 1, "ky": 9, "mix": 0.06, "strategy": "Monitor", "priority": "High"}, "Q4": {"kobuta": 8, "yanmar": 1, "ky": 9, "mix": 0.07, "strategy": "Analyze", "priority": "High"}}, {"province": "Nakhon Phanom", "district": "Renu Nakhon", "annual": {"kobuta": 33, "yanmar": 8, "ky": 41, "mix": 0.07, "strategy": "Attack", "priority": "High"}, "Q1": {"kobuta": 10, "yanmar": 3, "ky": 13, "mix": 0.06, "strategy": "Attack", "priority": "High"}, "Q2": {"kobuta": 6, "yanmar": 1, "ky": 7, "mix": 0.07, "strategy": "Analyze", "priority": "High"}, "Q3": {"kobuta": 13, "yanmar": 1, "ky": 14, "mix": 0.1, "strategy": "Analyze", "priority": "High"}, "Q4": {"kobuta": 4, "yanmar": 3, "ky": 7, "mix": 0.05, "strategy": "Attack", "priority": "High"}}, {"province": "Nakhon Phanom", "district": "Na Wa", "annual": {"kobuta": 34, "yanmar": 5, "ky": 39, "mix": 0.07, "strategy": "Analyze", "priority": "High"}, "Q1": {"kobuta": 9, "yanmar": 3, "ky": 12, "mix": 0.06, "strategy": "Attack", "priority": "Medium"}, "Q2": {"kobuta": 6, "yanmar": 0, "ky": 6, "mix": 0.06, "strategy": "Analyze", "priority": "High"}, "Q3": {"kobuta": 8, "yanmar": 0, "ky": 8, "mix": 0.06, "strategy": "Analyze", "priority": "High"}, "Q4": {"kobuta": 11, "yanmar": 2, "ky": 13, "mix": 0.1, "strategy": "Maintain", "priority": "High"}}, {"province": "Nakhon Phanom", "district": "Tha Uthen", "annual": {"kobuta": 32, "yanmar": 7, "ky": 39, "mix": 0.07, "strategy": "Maintain", "priority": "Medium"}, "Q1": {"kobuta": 10, "yanmar": 3, "ky": 13, "mix": 0.06, "strategy": "Maintain", "priority": "Medium"}, "Q2": {"kobuta": 7, "yanmar": 3, "ky": 10, "mix": 0.09, "strategy": "Attack", "priority": "Medium"}, "Q3": {"kobuta": 6, "yanmar": 1, "ky": 7, "mix": 0.05, "strategy": "Attack", "priority": "Medium"}, "Q4": {"kobuta": 9, "yanmar": 0, "ky": 9, "mix": 0.07, "strategy": "Analyze", "priority": "Medium"}}, {"province": "Nakhon Phanom", "district": "That Phanom", "annual": {"kobuta": 33, "yanmar": 6, "ky": 39, "mix": 0.07, "strategy": "Maintain", "priority": "Medium"}, "Q1": {"kobuta": 9, "yanmar": 4, "ky": 13, "mix": 0.06, "strategy": "Attack", "priority": "Medium"}, "Q2": {"kobuta": 6, "yanmar": 0, "ky": 6, "mix": 0.06, "strategy": "Analyze", "priority": "Medium"}, "Q3": {"kobuta": 11, "yanmar": 1, "ky": 12, "mix": 0.09, "strategy": "Analyze", "priority": "Medium"}, "Q4": {"kobuta": 7, "yanmar": 1, "ky": 8, "mix": 0.06, "strategy": "Maintain", "priority": "Medium"}}, {"province": "Nakhon Phanom", "district": "Ban Phaeng", "annual": {"kobuta": 22, "yanmar": 2, "ky": 24, "mix": 0.04, "strategy": "Attack", "priority": "Low"}, "Q1": {"kobuta": 9, "yanmar": 1, "ky": 10, "mix": 0.05, "strategy": "Maintain", "priority": "Low"}, "Q2": {"kobuta": 4, "yanmar": 0, "ky": 4, "mix": 0.04, "strategy": "Monitor", "priority": "Low"}, "Q3": {"kobuta": 3, "yanmar": 0, "ky": 3, "mix": 0.02, "strategy": "Attack", "priority": "Medium"}, "Q4": {"kobuta": 6, "yanmar": 1, "ky": 7, "mix": 0.05, "strategy": "Attack", "priority": "Low"}}, {"province": "Nakhon Phanom", "district": "Wang Yang", "annual": {"kobuta": 19, "yanmar": 3, "ky": 22, "mix": 0.04, "strategy": "Attack", "priority": "Low"}, "Q1": {"kobuta": 6, "yanmar": 0, "ky": 6, "mix": 0.03, "strategy": "Attack", "priority": "Low"}, "Q2": {"kobuta": 3, "yanmar": 1, "ky": 4, "mix": 0.04, "strategy": "Attack", "priority": "Low"}, "Q3": {"kobuta": 6, "yanmar": 1, "ky": 7, "mix": 0.05, "strategy": "Analyze", "priority": "Low"}, "Q4": {"kobuta": 4, "yanmar": 1, "ky": 5, "mix": 0.04, "strategy": "Attack", "priority": "Low"}}, {"province": "Sakon Nakhon", "district": "Mueang Sakon Nakhon", "annual": {"kobuta": 67, "yanmar": 14, "ky": 81, "mix": 0.18, "strategy": "Attack", "priority": "High"}, "Q1": {"kobuta": 23, "yanmar": 11, "ky": 34, "mix": 0.2, "strategy": "Attack", "priority": "High"}, "Q2": {"kobuta": 17, "yanmar": 0, "ky": 17, "mix": 0.19, "strategy": "Attack", "priority": "High"}, "Q3": {"kobuta": 16, "yanmar": 2, "ky": 18, "mix": 0.19, "strategy": "Attack", "priority": "High"}, "Q4": {"kobuta": 11, "yanmar": 1, "ky": 12, "mix": 0.14, "strategy": "Monitor", "priority": "High"}}, {"province": "Sakon Nakhon", "district": "Phanna Nikhom", "annual": {"kobuta": 64, "yanmar": 8, "ky": 72, "mix": 0.16, "strategy": "Analyze", "priority": "High"}, "Q1": {"kobuta": 25, "yanmar": 1, "ky": 26, "mix": 0.15, "strategy": "Analyze", "priority": "High"}, "Q2": {"kobuta": 17, "yanmar": 4, "ky": 21, "mix": 0.23, "strategy": "Analyze", "priority": "High"}, "Q3": {"kobuta": 11, "yanmar": 2, "ky": 13, "mix": 0.13, "strategy": "Attack", "priority": "High"}, "Q4": {"kobuta": 11, "yanmar": 1, "ky": 12, "mix": 0.14, "strategy": "Analyze", "priority": "High"}}, {"province": "Sakon Nakhon", "district": "Kusuman", "annual": {"kobuta": 50, "yanmar": 13, "ky": 63, "mix": 0.14, "strategy": "Attack", "priority": "High"}, "Q1": {"kobuta": 17, "yanmar": 6, "ky": 23, "mix": 0.13, "strategy": "Attack", "priority": "High"}, "Q2": {"kobuta": 11, "yanmar": 3, "ky": 14, "mix": 0.15, "strategy": "Attack", "priority": "High"}, "Q3": {"kobuta": 15, "yanmar": 2, "ky": 17, "mix": 0.18, "strategy": "Attack", "priority": "High"}, "Q4": {"kobuta": 7, "yanmar": 2, "ky": 9, "mix": 0.11, "strategy": "Attack", "priority": "High"}}, {"province": "Sakon Nakhon", "district": "Phang Khon", "annual": {"kobuta": 35, "yanmar": 9, "ky": 44, "mix": 0.1, "strategy": "Attack", "priority": "High"}, "Q1": {"kobuta": 15, "yanmar": 1, "ky": 16, "mix": 0.09, "strategy": "Analyze", "priority": "High"}, "Q2": {"kobuta": 8, "yanmar": 1, "ky": 9, "mix": 0.1, "strategy": "Maintain", "priority": "High"}, "Q3": {"kobuta": 6, "yanmar": 4, "ky": 10, "mix": 0.1, "strategy": "Attack", "priority": "High"}, "Q4": {"kobuta": 6, "yanmar": 3, "ky": 9, "mix": 0.11, "strategy": "Attack", "priority": "High"}}, {"province": "Sakon Nakhon", "district": "Phon Na Kaeo", "annual": {"kobuta": 31, "yanmar": 7, "ky": 38, "mix": 0.09, "strategy": "Monitor", "priority": "High"}, "Q1": {"kobuta": 13, "yanmar": 1, "ky": 14, "mix": 0.08, "strategy": "Analyze", "priority": "High"}, "Q2": {"kobuta": 2, "yanmar": 2, "ky": 4, "mix": 0.04, "strategy": "Attack", "priority": "High"}, "Q3": {"kobuta": 7, "yanmar": 4, "ky": 11, "mix": 0.11, "strategy": "Attack", "priority": "High"}, "Q4": {"kobuta": 9, "yanmar": 0, "ky": 9, "mix": 0.11, "strategy": "Monitor", "priority": "High"}}, {"province": "Sakon Nakhon", "district": "Phu Phan", "annual": {"kobuta": 28, "yanmar": 8, "ky": 36, "mix": 0.08, "strategy": "Analyze", "priority": "High"}, "Q1": {"kobuta": 7, "yanmar": 5, "ky": 12, "mix": 0.07, "strategy": "Maintain", "priority": "High"}, "Q2": {"kobuta": 8, "yanmar": 0, "ky": 8, "mix": 0.09, "strategy": "Attack", "priority": "Medium"}, "Q3": {"kobuta": 7, "yanmar": 0, "ky": 7, "mix": 0.07, "strategy": "Analyze", "priority": "High"}, "Q4": {"kobuta": 6, "yanmar": 3, "ky": 9, "mix": 0.11, "strategy": "Attack", "priority": "High"}}, {"province": "Sakon Nakhon", "district": "Waritchaphum", "annual": {"kobuta": 30, "yanmar": 4, "ky": 34, "mix": 0.08, "strategy": "Attack", "priority": "Medium"}, "Q1": {"kobuta": 14, "yanmar": 2, "ky": 16, "mix": 0.09, "strategy": "Attack", "priority": "Medium"}, "Q2": {"kobuta": 3, "yanmar": 1, "ky": 4, "mix": 0.04, "strategy": "Attack", "priority": "Medium"}, "Q3": {"kobuta": 7, "yanmar": 1, "ky": 8, "mix": 0.08, "strategy": "Attack", "priority": "Medium"}, "Q4": {"kobuta": 6, "yanmar": 0, "ky": 6, "mix": 0.07, "strategy": "Analyze", "priority": "High"}}, {"province": "Sakon Nakhon", "district": "Kut Bak", "annual": {"kobuta": 27, "yanmar": 4, "ky": 31, "mix": 0.07, "strategy": "Attack", "priority": "Medium"}, "Q1": {"kobuta": 15, "yanmar": 1, "ky": 16, "mix": 0.09, "strategy": "Analyze", "priority": "Medium"}, "Q2": {"kobuta": 4, "yanmar": 2, "ky": 6, "mix": 0.07, "strategy": "Attack", "priority": "Medium"}, "Q3": {"kobuta": 2, "yanmar": 0, "ky": 2, "mix": 0.02, "strategy": "Monitor", "priority": "Medium"}, "Q4": {"kobuta": 6, "yanmar": 1, "ky": 7, "mix": 0.08, "strategy": "Attack", "priority": "Medium"}}, {"province": "Sakon Nakhon", "district": "Khok Si Suphan", "annual": {"kobuta": 15, "yanmar": 4, "ky": 19, "mix": 0.04, "strategy": "Attack", "priority": "Medium"}, "Q1": {"kobuta": 4, "yanmar": 3, "ky": 7, "mix": 0.04, "strategy": "Attack", "priority": "Medium"}, "Q2": {"kobuta": 5, "yanmar": 1, "ky": 6, "mix": 0.07, "strategy": "Attack", "priority": "Low"}, "Q3": {"kobuta": 4, "yanmar": 0, "ky": 4, "mix": 0.04, "strategy": "Analyze", "priority": "Medium"}, "Q4": {"kobuta": 2, "yanmar": 0, "ky": 2, "mix": 0.02, "strategy": "Monitor", "priority": "Medium"}}, {"province": "Sakon Nakhon", "district": "Tao Ngoi", "annual": {"kobuta": 15, "yanmar": 1, "ky": 16, "mix": 0.04, "strategy": "Attack", "priority": "Low"}, "Q1": {"kobuta": 3, "yanmar": 1, "ky": 4, "mix": 0.02, "strategy": "Attack", "priority": "Low"}, "Q2": {"kobuta": 2, "yanmar": 0, "ky": 2, "mix": 0.02, "strategy": "Analyze", "priority": "Low"}, "Q3": {"kobuta": 7, "yanmar": 0, "ky": 7, "mix": 0.07, "strategy": "Monitor", "priority": "Low"}, "Q4": {"kobuta": 3, "yanmar": 0, "ky": 3, "mix": 0.04, "strategy": "Analyze", "priority": "Medium"}}, {"province": "Sakon Nakhon", "district": "Nikhom Nam Un", "annual": {"kobuta": 10, "yanmar": 1, "ky": 11, "mix": 0.02, "strategy": "Attack", "priority": "Low"}, "Q1": {"kobuta": 5, "yanmar": 1, "ky": 6, "mix": 0.03, "strategy": "Maintain", "priority": "Low"}, "Q2": {"kobuta": 0, "yanmar": 0, "ky": 0, "mix": 0, "strategy": "Monitor", "priority": "Low"}, "Q3": {"kobuta": 0, "yanmar": 0, "ky": 0, "mix": 0, "strategy": "Monitor", "priority": "Low"}, "Q4": {"kobuta": 5, "yanmar": 0, "ky": 5, "mix": 0.06, "strategy": "Attack", "priority": "Low"}}];
+
+const COLOR_KOBUTA = '#f59e0b';
+const COLOR_YANMAR = '#dc2626';
+
+let state = { province: 'all', quarter: 'annual', sort: 'ky_desc' };
+let charts = {};
+
+function getPeriodData(row, period) {
+  return row[period];
+}
+
+function currentRows() {
+  let rows = RAW.filter(r => state.province === 'all' || r.province === state.province);
+  rows = rows.map(r => {
+    const p = getPeriodData(r, state.quarter);
+    return { province: r.province, district: r.district, kobuta: p.kobuta, yanmar: p.yanmar,
+              ky: p.ky, mix: p.ky > 0 ? (p.yanmar / p.ky) : 0, strategy: p.strategy, priority: p.priority };
+  });
+  const sortMap = {
+    ky_desc: (a,b) => b.ky - a.ky,
+    kobuta_desc: (a,b) => b.kobuta - a.kobuta,
+    yanmar_desc: (a,b) => b.yanmar - a.yanmar,
+    mix_desc: (a,b) => b.mix - a.mix,
+  };
+  rows.sort(sortMap[state.sort]);
+  return rows;
+}
+
+function fmt(n){ return n.toLocaleString('th-TH'); }
+function pct(n){ return (n*100).toFixed(0) + '%'; }
+
+function renderKPIs(rows) {
+  const totalKobuta = rows.reduce((s,r)=>s+r.kobuta,0);
+  const totalYanmar = rows.reduce((s,r)=>s+r.yanmar,0);
+  const totalKY = totalKobuta + totalYanmar;
+  const yanmarShare = totalKY > 0 ? totalYanmar/totalKY : 0;
+  const attackCount = rows.filter(r=>r.strategy==='Attack').length;
+
+  const kpis = [
+    {label:'ยอดจดทะเบียน Kubota', value: fmt(totalKobuta), cls:'kobuta', sub: rows.length + ' อำเภอในมุมมองนี้'},
+    {label:'ยอดจดทะเบียน Yanmar', value: fmt(totalYanmar), cls:'yanmar', sub: 'ส่วนแบ่งตลาด ' + pct(yanmarShare)},
+    {label:'ยอดรวมตลาด (K+Y)', value: fmt(totalKY), cls:'', sub: state.quarter === 'annual' ? 'ทั้งปี FY26' : state.quarter},
+    {label:'อำเภอกลยุทธ์ Attack', value: attackCount, cls:'', sub: 'จากทั้งหมด ' + rows.length + ' อำเภอ'},
+  ];
+  document.getElementById('kpi-row').innerHTML = kpis.map(k => `
+    <div class="kpi-card">
+      <div class="kpi-label">${k.label}</div>
+      <div class="kpi-value ${k.cls}">${k.value}</div>
+      <div class="kpi-sub">${k.sub}</div>
+    </div>`).join('');
+}
+
+function renderDistrictChart(rows) {
+  const ctx = document.getElementById('districtChart').getContext('2d');
+  const labels = rows.map(r=>r.district);
+  if (charts.district) charts.district.destroy();
+  charts.district = new Chart(ctx, {
+    type: 'bar',
+    data: {
+      labels,
+      datasets: [
+        {label:'Kubota', data: rows.map(r=>r.kobuta), backgroundColor: COLOR_KOBUTA},
+        {label:'Yanmar', data: rows.map(r=>r.yanmar), backgroundColor: COLOR_YANMAR},
+      ]
+    },
+    options: {
+      responsive:true, maintainAspectRatio:false,
+      scales:{ x:{ stacked:false, ticks:{autoSkip:false, maxRotation:60, minRotation:40, font:{size:10}} }, y:{beginAtZero:true} },
+      plugins:{ legend:{position:'top'} }
+    }
+  });
+}
+
+function renderPieChart(rows) {
+  const ctx = document.getElementById('pieChart').getContext('2d');
+  const totalKobuta = rows.reduce((s,r)=>s+r.kobuta,0);
+  const totalYanmar = rows.reduce((s,r)=>s+r.yanmar,0);
+  if (charts.pie) charts.pie.destroy();
+  charts.pie = new Chart(ctx, {
+    type:'doughnut',
+    data:{ labels:['Kubota','Yanmar'], datasets:[{data:[totalKobuta, totalYanmar], backgroundColor:[COLOR_KOBUTA, COLOR_YANMAR]}] },
+    options:{ responsive:true, maintainAspectRatio:false, plugins:{legend:{position:'bottom'}} }
+  });
+}
+
+function renderTrendChart() {
+  const ctx = document.getElementById('trendChart').getContext('2d');
+  let rows = RAW.filter(r => state.province === 'all' || r.province === state.province);
+  const quarters = ['Q1','Q2','Q3','Q4'];
+  const kobutaSeries = quarters.map(q => rows.reduce((s,r)=>s+r[q].kobuta,0));
+  const yanmarSeries = quarters.map(q => rows.reduce((s,r)=>s+r[q].yanmar,0));
+  if (charts.trend) charts.trend.destroy();
+  charts.trend = new Chart(ctx, {
+    type:'line',
+    data:{
+      labels: quarters,
+      datasets:[
+        {label:'Kubota', data: kobutaSeries, borderColor: COLOR_KOBUTA, backgroundColor: COLOR_KOBUTA+'30', fill:true, tension:.3},
+        {label:'Yanmar', data: yanmarSeries, borderColor: COLOR_YANMAR, backgroundColor: COLOR_YANMAR+'30', fill:true, tension:.3},
+      ]
+    },
+    options:{ responsive:true, maintainAspectRatio:false, plugins:{legend:{position:'top'}}, scales:{y:{beginAtZero:true}} }
+  });
+}
+
+function renderShareChart(rows) {
+  const ctx = document.getElementById('shareChart').getContext('2d');
+  const sorted = [...rows].sort((a,b)=> b.mix - a.mix);
+  if (charts.share) charts.share.destroy();
+  charts.share = new Chart(ctx, {
+    type:'bar',
+    data:{
+      labels: sorted.map(r=>r.district),
+      datasets:[{label:'Yanmar Mix %', data: sorted.map(r=>+(r.mix*100).toFixed(1)), backgroundColor: sorted.map(r=> r.mix >= 0.15 ? '#059669' : (r.mix>=0.08 ? '#d97706' : '#dc2626'))}]
+    },
+    options:{
+      indexAxis:'y', responsive:true, maintainAspectRatio:false,
+      plugins:{legend:{display:false}, tooltip:{callbacks:{label: c=> c.parsed.x + '%'}}},
+      scales:{ x:{beginAtZero:true, max:100, ticks:{callback:v=>v+'%'}} }
+    }
+  });
+}
+
+function badge(text){ return `<span class="badge ${text}">${text}</span>`; }
+
+function renderTable(rows) {
+  const tbody = document.querySelector('#data-table tbody');
+  const maxKY = Math.max(...rows.map(r=>r.ky), 1);
+  tbody.innerHTML = rows.map(r => `
+    <tr>
+      <td>${r.province}</td>
+      <td>${r.district}</td>
+      <td>${fmt(r.kobuta)}</td>
+      <td>${fmt(r.yanmar)}</td>
+      <td>
+        <span class="bar-mini"><span class="bar-mini-fill" style="width:${(r.ky/maxKY*100).toFixed(0)}%;background:#6b7280"></span></span>
+        ${fmt(r.ky)}
+      </td>
+      <td>${pct(r.mix)}</td>
+      <td>${badge(r.strategy || '-')}</td>
+      <td>${badge(r.priority || '-')}</td>
+    </tr>`).join('');
+}
+
+function renderAll() {
+  const rows = currentRows();
+  renderKPIs(rows);
+  document.getElementById('chart1-title').textContent =
+    'ยอดจดทะเบียนแยกตามอำเภอ: Kubota vs Yanmar (' + (state.quarter==='annual' ? 'ทั้งปี FY26' : state.quarter) + ')';
+  renderDistrictChart(rows);
+  renderPieChart(rows);
+  renderTrendChart();
+  renderShareChart(rows);
+  renderTable(rows);
+}
+
+// populate province filter
+const provinces = [...new Set(RAW.map(r=>r.province))];
+const provSelect = document.getElementById('filter-province');
+provinces.forEach(p => {
+  const opt = document.createElement('option');
+  opt.value = p; opt.textContent = p;
+  provSelect.appendChild(opt);
+});
+
+document.getElementById('filter-province').addEventListener('change', e => { state.province = e.target.value; renderAll(); });
+document.getElementById('filter-quarter').addEventListener('change', e => { state.quarter = e.target.value; renderAll(); });
+document.getElementById('filter-sort').addEventListener('change', e => { state.sort = e.target.value; renderAll(); });
+
+// sortable table headers
+document.querySelectorAll('#data-table thead th').forEach(th => {
+  th.addEventListener('click', () => {
+    const key = th.dataset.key;
+    const map = { kobuta:'kobuta_desc', yanmar:'yanmar_desc', ky:'ky_desc', mix:'mix_desc' };
+    if (map[key]) { state.sort = map[key]; document.getElementById('filter-sort').value = map[key]; renderAll(); }
+  });
+});
+
+renderAll();
+</script>
+</body>
+</html>
